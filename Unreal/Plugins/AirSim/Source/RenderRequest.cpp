@@ -78,23 +78,24 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
                 // execute *immediately* after RenderThread renders the scene!
                 RenderRequest* This = this;
                 ENQUEUE_RENDER_COMMAND(SceneDrawCompletion)
-                (
-                    [This](FRHICommandListImmediate& RHICmdList) {
-                        This->ExecuteTask();
-                    });
+                    (
+                        [This](FRHICommandListImmediate& RHICmdList) {
+                            This->ExecuteTask();
+                        });
 
                 game_viewport_->bDisableWorldRendering = saved_DisableWorldRendering_;
 
                 assert(end_draw_handle_.IsValid());
                 game_viewport_->OnEndDraw().Remove(end_draw_handle_);
-            });
+                });
 
             // while we're still on GameThread, enqueue request for capture the scene!
             for (unsigned int i = 0; i < req_size_; ++i) {
                 auto& temp_param = params_[i];
-                if ( !temp_param->is_cube ) {
+                if (!temp_param->is_cube) {
                     temp_param->render_component->CaptureSceneDeferred();
-                } else {
+                }
+                else {
                     // Cube. If render_component only calls the overrided methods, 
                     // we can use polymorphism with virtual function calls.
                     temp_param->render_component_cube->CaptureSceneDeferred();
@@ -103,7 +104,7 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
                     unWarpTextureRenderTargetCube(temp_param->render_target_cube, results_[i]->cube_raw);
                 }
             }
-        });
+            });
 
         // wait for this task to complete
         while (!wait_signal_->waitFor(5)) {
@@ -114,6 +115,7 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
         }
     }
 
+    // Cube. No modificatons made so far.
     for (unsigned int i = 0; i < req_size; ++i) {
         if (!params[i]->is_cube) {
             if (!params[i]->pixels_as_float) {
@@ -138,7 +140,8 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
                     *ptr++ = item.R.GetFloat();
                 }
             }
-        } else { // params[i]->is_cube
+        }
+        else { // params[i]->is_cube
             //// Get the raw 8bit data.
             //unWarpTextureRenderTargetCube(params[i]->render_target_cube, results[i]->cube_raw);
 
@@ -146,25 +149,27 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
                 // RRG 8bit.
                 if (params[i]->compress) {
                     // Compress.
-                    compressTArrayAsPng32bit( results[i]->cube_raw, results[i]->cube_image_data, 
-                        results[i]->width, results[i]->height, 100 );
+                    compressTArrayAsPng32bit(results[i]->cube_raw, results[i]->cube_image_data,
+                        results[i]->width, results[i]->height, 100);
                     // UAirBlueprintLib::CompressImageArray(results[i]->width, results[i]->height, results[i]->bmp, results[i]->image_data_uint8);
                     // Copy the data from TArray64 to TArray.
-                    copyFromTArray2TArray( results[i]->cube_image_data, results[i]->image_data_uint8 );
-                } else {
-                    copyFromTArray2TArray( results[i]->cube_raw, results[i]->image_data_uint8 );
+                    copyFromTArray2TArray(results[i]->cube_image_data, results[i]->image_data_uint8);
                 }
-            } else {
+                else {
+                    copyFromTArray2TArray(results[i]->cube_raw, results[i]->image_data_uint8);
+                }
+            }
+            else {
                 // FFloat16Color.
-                auto tempF16 = reinterpret_cast<FFloat16*>( results[i]->cube_raw.GetData() );
+                auto tempF16 = reinterpret_cast<FFloat16*>(results[i]->cube_raw.GetData());
 
                 // Initialize the memory.
                 results[i]->image_data_float.SetNumUninitialized(results[i]->width * results[i]->height);
 
                 // Loop and copy.
                 float* ptr = results[i]->image_data_float.GetData();
-                const int N = results[i]->cube_raw.Num()/2; // Every FFloat16 contains 2 uint8.
-                for ( int f16 = 0; f16 < N; f16 += 4 ) {
+                const int N = results[i]->cube_raw.Num() / 2; // Every FFloat16 contains 2 uint8.
+                for (int f16 = 0; f16 < N; f16 += 4) {
                     *ptr++ = (tempF16 + f16)->GetFloat() * 0.01f; // Convert from centimeter to meter.
                 }
             }
@@ -176,27 +181,32 @@ FReadSurfaceDataFlags RenderRequest::setupRenderResource(const FTextureRenderTar
 {
     size = rt_resource->GetSizeXY();
     result->width = size.X;
-    result->height = size.Y;
+    result->height = size.Y; // Cube. It seems that this is general. Cube returns SizeX.
     FReadSurfaceDataFlags flags(RCM_UNorm, CubeFace_MAX);
     flags.SetLinearToGamma(false);
 
     return flags;
 }
 
-bool RenderRequest::unWarpTextureRenderTargetCube( const UTextureRenderTargetCube* TRTCube, TArray64<uint8>& OutData ) {
+bool RenderRequest::unWarpTextureRenderTargetCube(const UTextureRenderTargetCube* TRTCube, TArray64<uint8>& OutData) {
     FIntPoint Size;
-	EPixelFormat PixelFormat;
+    EPixelFormat PixelFormat;
 
-	if ( !CubemapHelpers::GenerateLongLatUnwrap( TRTCube, OutData, Size, PixelFormat ) )
-	{
-		UE_LOG(LogTemp, Warning, TEXT("CubemapHelpers::GenerateLogLatUnwrap() failed. "));
-		return false;
-	}
+    if (!CubemapHelpers::GenerateLongLatUnwrap(TRTCube, OutData, Size, PixelFormat))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("CubemapHelpers::GenerateLogLatUnwrap() failed. "));
+        return false;
+    }
 
-	verifyf( TRTCube->SizeX == Size.Y,   TEXT("TRTCube.SizeX = %d, Size.Y = %d"), TRTCube->SizeX, Size.Y );
-	verifyf( TRTCube->SizeX == Size.X/2, TEXT("TRTCube.SizeX = %d, Size.X = %d"), TRTCube->SizeX, Size.X );
-	verifyf( TRTCube->GetFormat() == PixelFormat, 
-		TEXT("TRTCube->GetFormat() = %d, PixelFormat = %d. "), TRTCube->GetFormat(), PixelFormat );
+    for (int32 i = 3; i < OutData.Num(); i += 4)
+    {
+        OutData[i] = 255;
+    }
+
+    verifyf(TRTCube->SizeX == Size.Y, TEXT("TRTCube.SizeX = %d, Size.Y = %d"), TRTCube->SizeX, Size.Y);
+    verifyf(TRTCube->SizeX == Size.X / 2, TEXT("TRTCube.SizeX = %d, Size.X = %d"), TRTCube->SizeX, Size.X);
+    verifyf(TRTCube->GetFormat() == PixelFormat,
+        TEXT("TRTCube->GetFormat() = %d, PixelFormat = %d. "), TRTCube->GetFormat(), PixelFormat);
 
     return true;
 }
@@ -206,13 +216,13 @@ void RenderRequest::ExecuteTask()
     if (params_ != nullptr && req_size_ > 0) {
         for (unsigned int i = 0; i < req_size_; ++i) {
             // Cube.
-            if ( params_[i]->is_cube ) {
-                results_[i]->width  = params_[i]->render_target_cube->SizeX * 2;
+            if (params_[i]->is_cube) {
+                results_[i]->width = params_[i]->render_target_cube->SizeX * 2;
                 results_[i]->height = params_[i]->render_target_cube->SizeX;
                 results_[i]->time_stamp = msr::airlib::ClockFactory::get()->nowNanos();
                 continue;
             }
-            
+
             FRHICommandListImmediate& RHICmdList = GetImmediateCommandList_ForRenderCommand();
             auto rt_resource = params_[i]->render_target->GetRenderTargetResource();
             if (rt_resource != nullptr) {

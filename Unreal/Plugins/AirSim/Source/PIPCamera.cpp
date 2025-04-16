@@ -21,7 +21,7 @@ APIPCamera::APIPCamera(const FObjectInitializer& ObjectInitializer)
         noise_material_static_ = mat_finder.Object;
     }
     else
-        UAirBlueprintLib::LogMessageString("Cannot create noise material for the PIPCamera",
+        UAirBlueprintLib::LogMessageString("Cannot create noise material for the PIPCamera", 
                                            "",
                                            LogDebugLevel::Failure);
 
@@ -59,25 +59,25 @@ void APIPCamera::PostInitializeComponents()
 
     //CinemAirSim
     camera_ = UAirBlueprintLib::GetActorComponent<UCineCameraComponent>(this, TEXT("CameraComponent"));
-    captures_.Init(nullptr, imageTypeCount());
-    render_targets_.Init(nullptr, imageTypeCount());
-    detections_.Init(nullptr, imageTypeCount());
+    captures_.Init(nullptr, imageTypeCount2D());
+    render_targets_.Init(nullptr, imageTypeCount2D());
+    detections_.Init(nullptr, imageTypeCount2D());
 
-    captures_[Utils::toNumeric(ImageType::Scene)] =
+    captures_[Utils::toNumeric(ImageType::Scene)] = 
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("SceneCaptureComponent"));
-    captures_[Utils::toNumeric(ImageType::DepthPlanar)] =
+    captures_[Utils::toNumeric(ImageType::DepthPlanar)] = 
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("DepthPlanarCaptureComponent"));
     captures_[Utils::toNumeric(ImageType::DepthPerspective)] =
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("DepthPerspectiveCaptureComponent"));
-    captures_[Utils::toNumeric(ImageType::DepthVis)] =
+    captures_[Utils::toNumeric(ImageType::DepthVis)] = 
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("DepthVisCaptureComponent"));
-    captures_[Utils::toNumeric(ImageType::DisparityNormalized)] =
+    captures_[Utils::toNumeric(ImageType::DisparityNormalized)] = 
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("DisparityNormalizedCaptureComponent"));
-    captures_[Utils::toNumeric(ImageType::Segmentation)] =
+    captures_[Utils::toNumeric(ImageType::Segmentation)] = 
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("SegmentationCaptureComponent"));
-    captures_[Utils::toNumeric(ImageType::Infrared)] =
+    captures_[Utils::toNumeric(ImageType::Infrared)] = 
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("InfraredCaptureComponent"));
-    captures_[Utils::toNumeric(ImageType::SurfaceNormals)] =
+    captures_[Utils::toNumeric(ImageType::SurfaceNormals)] = 
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("NormalsCaptureComponent"));
     captures_[Utils::toNumeric(ImageType::OpticalFlow)] =
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("OpticalFlowCaptureComponent"));
@@ -92,7 +92,7 @@ void APIPCamera::PostInitializeComponents()
             detections_[i]->Deactivate();
         }
     }
-    
+
     // Cube.
     captures_cube_.Init( nullptr, cubeTypeCount() );
     render_targets_cube_.Init( nullptr, cubeTypeCount() );
@@ -120,8 +120,8 @@ void APIPCamera::BeginPlay()
 {
     Super::BeginPlay();
 
-    noise_materials_.AddZeroed(imageTypeCount() + 1);
-    distortion_materials_.AddZeroed(imageTypeCount() + 1);
+    noise_materials_.AddZeroed(imageTypeCount2D() + 1);
+    distortion_materials_.AddZeroed(imageTypeCount2D() + 1);
 
     //by default all image types are disabled
     camera_type_enabled_.assign(imageTypeCount(), false);
@@ -214,7 +214,7 @@ msr::airlib::ProjectionMatrix APIPCamera::getProjectionMatrix(const APIPCamera::
                     GNearClippingPlane);
             }
         }
-
+        
         //Takes a vector from NORTH-EAST-DOWN coordinates (AirSim) to EAST-UP-SOUTH coordinates (Unreal). Leaves W coordinate unchanged.
         FMatrix coordinateChangeTranspose = FMatrix(
             FPlane(0, 0, -1, 0),
@@ -240,14 +240,14 @@ void APIPCamera::Tick(float DeltaTime)
     if (gimbal_stabilization_ > 0) {
         FRotator rotator = this->GetActorRotation();
         if (!std::isnan(gimbald_rotator_.Pitch))
-            rotator.Pitch = gimbald_rotator_.Pitch * gimbal_stabilization_ +
-                            rotator.Pitch * (1 - gimbal_stabilization_);
+            rotator.Pitch = gimbald_rotator_.Pitch * gimbal_stabilization_ + 
+                rotator.Pitch * (1 - gimbal_stabilization_);
         if (!std::isnan(gimbald_rotator_.Roll))
             rotator.Roll = gimbald_rotator_.Roll * gimbal_stabilization_ +
-                           rotator.Roll * (1 - gimbal_stabilization_);
+                rotator.Roll * (1 - gimbal_stabilization_);
         if (!std::isnan(gimbald_rotator_.Yaw))
-            rotator.Yaw = gimbald_rotator_.Yaw * gimbal_stabilization_ +
-                          rotator.Yaw * (1 - gimbal_stabilization_);
+            rotator.Yaw = gimbald_rotator_.Yaw * gimbal_stabilization_ + 
+                rotator.Yaw * (1 - gimbal_stabilization_);
 
         this->SetActorRotation(rotator);
     }
@@ -342,6 +342,13 @@ void APIPCamera::setCaptureUpdate(USceneCaptureComponent2D* capture, bool nodisp
     capture->bAlwaysPersistRenderingState = true;
 }
 
+void APIPCamera::setCaptureUpdateCube(USceneCaptureComponentCube* capture, bool nodisplay)
+{
+    capture->bCaptureEveryFrame = !nodisplay;
+    capture->bCaptureOnMovement = !nodisplay;
+    capture->bAlwaysPersistRenderingState = true;
+}
+
 void APIPCamera::setCameraTypeUpdate(ImageType type, bool nodisplay)
 {
     USceneCaptureComponent2D* capture = getCaptureComponent(type, false);
@@ -363,14 +370,14 @@ void APIPCamera::setCameraPose(const msr::airlib::Pose& relative_pose)
         gimbald_rotator_.Yaw = rotator.Yaw;
     }
     else {
-        this->SetActorRelativeRotation(rotator);
-    }
+    this->SetActorRelativeRotation(rotator);
+}
 }
 
 void APIPCamera::setCameraFoV(float fov_degrees)
 {
-    int image_count = static_cast<int>(Utils::toNumeric(ImageType::Count));
-    for (int image_type = 0; image_type < image_count; ++image_type) {
+    // int image_count = static_cast<int>(Utils::toNumeric(ImageType::Count));
+    for (int image_type = 0; image_type < static_cast<int>(imageTypeCount2D()); ++image_type) {
         captures_[image_type]->FOVAngle = fov_degrees;
     }
 
@@ -442,19 +449,19 @@ void APIPCamera::setupCameraFromSettings(const APIPCamera::CameraSetting& camera
                 pixel_format = (pixel_format == EPixelFormat::PF_Unknown ? image_type_to_pixel_format_map_[image_type] : pixel_format);
 
                 switch (Utils::toEnum<ImageType>(image_type)) {
-                case ImageType::Scene:
-                case ImageType::Infrared:
+                    case ImageType::Scene:
+                    case ImageType::Infrared:
                     updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], false, pixel_format, capture_setting, ned_transform, false);
-                    break;
+                        break;
 
-                case ImageType::Segmentation:
-                case ImageType::SurfaceNormals:
+                    case ImageType::Segmentation:
+                    case ImageType::SurfaceNormals:                
                     updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], true, pixel_format, capture_setting, ned_transform, true);
-                    break;
+                        break;
 
-                default:
+                    default:
                     updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], true, pixel_format, capture_setting, ned_transform, false);
-                    break;
+                        break;
                 }
                 setDistortionMaterial(image_type, captures_[image_type], captures_[image_type]->PostProcessSettings);
                 setNoiseMaterial(image_type, captures_[image_type], captures_[image_type]->PostProcessSettings, noise_setting);
@@ -476,16 +483,16 @@ void APIPCamera::setupCameraFromSettings(const APIPCamera::CameraSetting& camera
     }
 }
 
-void APIPCamera::updateCaptureComponentSetting(USceneCaptureComponent2D* capture, UTextureRenderTarget2D* render_target,
-                                               bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting, const NedTransform& ned_transform,
-                                               bool force_linear_gamma)
+void APIPCamera::updateCaptureComponentSetting(USceneCaptureComponent2D* capture, UTextureRenderTarget2D* render_target, 
+    bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting, const NedTransform& ned_transform,
+    bool force_linear_gamma)
 {
     if (auto_format) {
         render_target->InitAutoFormat(setting.width, setting.height); //256 X 144, X 480
     }
     else {
         render_target->InitCustomFormat(setting.width, setting.height, pixel_format, force_linear_gamma);
-    }
+    } 
 
     if (!std::isnan(setting.target_gamma))
         render_target->TargetGamma = setting.target_gamma;
@@ -725,7 +732,6 @@ USceneCaptureComponent2D* APIPCamera::getCaptureComponent(const APIPCamera::Imag
     return nullptr;
 }
 
-
 USceneCaptureComponentCube* APIPCamera::getCaptureComponentCube( const APIPCamera::ImageType type, bool if_active )
 {
     const unsigned int image_type = Utils::toNumeric(type);
@@ -734,15 +740,6 @@ USceneCaptureComponentCube* APIPCamera::getCaptureComponentCube( const APIPCamer
     if (!if_active || camera_type_enabled_[image_type])
         return captures_cube_[cube_type];
     return nullptr;
-}
-
-USceneCaptureComponent* APIPCamera::getCaptureComponentGeneral( const APIPCamera::ImageType type, bool if_active )
-{
-    if ( ImageCaptureBase::isCubeType(type) ) {
-        return getCaptureComponentCube(type, if_active);
-    } else {
-        return getCaptureComponent(type, if_active);
-    }
 }
 
 void APIPCamera::disableAllPIP()
@@ -764,9 +761,17 @@ void APIPCamera::disableMain()
 void APIPCamera::onViewModeChanged(bool nodisplay)
 {
     for (unsigned int image_type = 0; image_type < imageTypeCount(); ++image_type) {
-        USceneCaptureComponent2D* capture = getCaptureComponent(static_cast<ImageType>(image_type), false);
-        if (capture) {
-            setCaptureUpdate(capture, nodisplay);
+        if (!ImageCaptureBase::isCubeType(image_type)) {
+            auto capture = getCaptureComponent(static_cast<ImageType>(image_type), false);
+            if (capture) {
+                setCaptureUpdate(capture, nodisplay);
+            }
+        }
+        else {
+            auto capture = getCaptureComponentCube(static_cast<ImageType>(image_type), false);
+            if (capture) {
+                setCaptureUpdateCube(capture, nodisplay);
+            }
         }
     }
 }
@@ -917,9 +922,8 @@ std::string APIPCamera::getCurrentFieldOfView() const
 
 void APIPCamera::copyCameraSettingsToAllSceneCapture(UCameraComponent* camera)
 {
-    int image_count = static_cast<int>(Utils::toNumeric(ImageType::Count));
-    for (int image_type = image_count - 1; image_type >= 0; image_type--) {
-        copyCameraSettingsToSceneCapture(camera_, captures_[image_type]);
+    for (unsigned int i = 0; i < imageTypeCount2D(); ++i) {
+        copyCameraSettingsToSceneCapture(camera_, captures_[i]);
     }
 }
 

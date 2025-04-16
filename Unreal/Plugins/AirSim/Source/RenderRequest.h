@@ -126,4 +126,5 @@ public:
         std::shared_ptr<RenderParams> params[], std::vector<std::shared_ptr<RenderResult>>& results, unsigned int req_size, bool use_safe_method);
 
     void ExecuteTask();
+    void GetTexturePixels(FTexture2DRHIRef Texture, TArray<FColor>& OutPixels);
 };

@@ -71,6 +71,8 @@ public:
     void setCaptureUpdate(USceneCaptureComponent2D* capture, bool nodisplay);
     void setCameraTypeUpdate(ImageType type, bool nodisplay);
 
+    void setCaptureUpdateCube(USceneCaptureComponentCube* capture, bool nodisplay);
+
     void setupCameraFromSettings(const CameraSetting& camera_setting, const NedTransform& ned_transform);
     void setCameraPose(const msr::airlib::Pose& relative_pose);
     void setCameraFoV(float fov_degrees);
@@ -88,7 +90,6 @@ public:
     USceneCaptureComponentCube* getCaptureComponentCube( const ImageType type, bool if_active );
     UTextureRenderTargetCube* getRenderTargetCube( const ImageType type, bool if_active );
     // UDetectionComponentCube* getDetectionComponentCube(const ImageType type, bool if_active) const;
-    USceneCaptureComponent* getCaptureComponentGeneral( const ImageType type, bool if_active );
 
     msr::airlib::Pose getPose() const;
 
